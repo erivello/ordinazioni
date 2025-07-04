@@ -45,5 +45,34 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Required for iOS 14+ network access -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Necessario per accedere al server dei piatti</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
+	
+	<!-- Permessi di rete -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	
+	<!-- Descrizione dell'uso della fotocamera (se necessario in futuro) -->
+	<key>NSCameraUsageDescription</key>
+	<string>Necessario per scattare foto dei piatti</string>
+	
+	<!-- Descrizione per l'uso della fotocamera (se necessario in futuro) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Necessario per selezionare foto dei piatti</string>
+		<true/>
+	</dict>
 </dict>
 </plist>

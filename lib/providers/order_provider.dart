@@ -8,21 +8,27 @@ class OrderProvider extends ChangeNotifier {
 
   void updateDishQuantity(Dish dish, int newQuantity) {
     if (newQuantity > 0) {
-      _selectedDishes[dish.name] = dish.copyWith(quantity: newQuantity);
+      _selectedDishes[dish.id] = dish.copyWith(quantity: newQuantity);
     } else {
-      _selectedDishes.remove(dish.name);
+      _selectedDishes.remove(dish.id);
     }
     notifyListeners();
   }
 
-  void removeDish(String dishName) {
-    _selectedDishes.remove(dishName);
+  void removeDish(String dishId) {
+    _selectedDishes.remove(dishId);
     notifyListeners();
   }
 
   void addDish(Dish dish) {
-    final quantity = _selectedDishes[dish.name]?.quantity ?? 0;
-    _selectedDishes[dish.name] = dish.copyWith(quantity: quantity + 1);
+    final existingDish = _selectedDishes[dish.id];
+    if (existingDish != null) {
+      _selectedDishes[dish.id] = dish.copyWith(
+        quantity: existingDish.quantity + 1,
+      );
+    } else {
+      _selectedDishes[dish.id] = dish.copyWith(quantity: 1);
+    }
     notifyListeners();
   }
 

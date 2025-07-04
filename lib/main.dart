@@ -1,13 +1,59 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'models/dish.dart';
-import 'models/dish_category.dart';
 import 'providers/order_provider.dart';
+import 'services/menu_service.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+  
+  // Get Supabase credentials from environment
+  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    debugPrint('Error: Missing Supabase credentials in .env file');
+  }
+
+  try {
+    debugPrint('Initializing Supabase...');
+    
+    // Initialize Supabase
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
+      debug: false,
+    );
+    
+    debugPrint('Supabase initialized successfully');
+    
+    // Test connection
+    try {
+      final response = await Supabase.instance.client
+          .from('dishes')
+          .select('count')
+          .limit(1)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 5));
+      debugPrint('Supabase connected: $response');
+    } catch (e) {
+      debugPrint('Warning: Could not connect to Supabase: $e');
+    }
+  } catch (e, stackTrace) {
+    debugPrint('Error initializing Supabase: $e\n$stackTrace');
+  }
+  
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => OrderProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => OrderProvider()),
+        Provider(create: (_) => MenuService()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -19,28 +65,60 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Gestione Ordini',
+      title: 'Sagra di San Lorenzo',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+        primarySwatch: Colors.green,
         useMaterial3: true,
       ),
       home: const OrderScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class OrderScreen extends StatelessWidget {
+class OrderScreen extends StatefulWidget {
   const OrderScreen({super.key});
 
   @override
+  State<OrderScreen> createState() => _OrderScreenState();
+}
+
+class _OrderScreenState extends State<OrderScreen> {
+  late Future<Map<String, List<Dish>>> _dishesByCategoryFuture;
+  final MenuService _menuService = MenuService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDishes();
+  }
+
+  void _loadDishes() {
+    try {
+      setState(() {
+        _dishesByCategoryFuture = _menuService.getDishesGroupedByCategory();
+      });
+    } catch (e) {
+      debugPrint('Error loading dishes: $e');
+      setState(() {
+        _dishesByCategoryFuture = Future.error('Errore nel caricamento del menù');
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Menù Sagra'),
-        actions: [
-          Consumer<OrderProvider>(
-            builder: (context, orderProvider, _) {
-              return Stack(
+    return Consumer<OrderProvider>(
+      builder: (context, orderProvider, _) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Menù Sagra San Lorenzo'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadDishes,
+              ),
+              Stack(
                 children: [
                   IconButton(
                     icon: const Icon(Icons.shopping_cart),
@@ -52,9 +130,9 @@ class OrderScreen extends StatelessWidget {
                       top: 8,
                       child: Container(
                         padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: Colors.red,
-                          borderRadius: BorderRadius.circular(10),
+                          shape: BoxShape.circle,
                         ),
                         constraints: const BoxConstraints(
                           minWidth: 16,
@@ -71,278 +149,229 @@ class OrderScreen extends StatelessWidget {
                       ),
                     ),
                 ],
-              );
-            },
+              ),
+            ],
           ),
-        ],
-      ),
-      body: Consumer<OrderProvider>(
-        builder: (context, orderProvider, _) {
-          final dishesByCategory = _groupDishesByCategory(Dish.getSampleDishes());
-          
-          return ListView.builder(
-            itemCount: dishesByCategory.length,
-            itemBuilder: (context, index) {
-              final category = dishesByCategory.keys.elementAt(index);
-              final dishes = dishesByCategory[category]!;
-              
-              return Column(
+          body: _buildDishList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildDishList() {
+    return FutureBuilder<Map<String, List<Dish>>>(
+      future: _dishesByCategoryFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text('Errore: ${snapshot.error}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _loadDishes,
+                  child: const Text('Riprova'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final dishesByCategory = snapshot.data;
+        if (dishesByCategory == null || dishesByCategory.isEmpty) {
+          return const Center(child: Text('Nessun piatto disponibile'));
+        }
+
+        return ListView(
+          children: [
+            ...dishesByCategory.entries.map(
+              (entry) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      category.name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).primaryColor,
-                      ),
+                    child: Row(
+                      children: [
+                        _getCategoryIcon(entry.key),
+                        const SizedBox(width: 8),
+                        Text(
+                          entry.key.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  ...dishes.map((dish) {
-                    final quantity = orderProvider.selectedDishes[dish.name]?.quantity ?? 0;
-                    
-                    return ListTile(
-                      leading: _getCategoryIcon(dish.category),
-                      title: Text(dish.name),
-                      subtitle: Text('€${dish.price.toStringAsFixed(2)}'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove),
-                            onPressed: quantity > 0
-                                ? () => orderProvider.updateDishQuantity(dish, quantity - 1)
-                                : null,
-                          ),
-                          Text('$quantity'),
-                          IconButton(
-                            icon: const Icon(Icons.add),
-                            onPressed: () => orderProvider.addDish(dish),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  const Divider(height: 32, thickness: 8, color: Colors.grey),
+                  ...entry.value.map((dish) => _buildDishItem(context, dish)),
+                  const Divider(height: 1),
                 ],
-              );
-            },
-          );
-        },
-      ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Map<DishCategory, List<Dish>> _groupDishesByCategory(List<Dish> dishes) {
-    final map = <DishCategory, List<Dish>>{};
-    
-    for (var dish in dishes) {
-      if (!map.containsKey(dish.category)) {
-        map[dish.category] = [];
-      }
-      map[dish.category]!.add(dish);
-    }
-    
-    // Ordiniamo le categorie nell'ordine desiderato
-    final orderedMap = <DishCategory, List<Dish>>{};
-    for (var category in DishCategory.values) {
-      if (map.containsKey(category)) {
-        orderedMap[category] = map[category]!;
-      }
-    }
-    
-    return orderedMap;
+  Widget _buildDishItem(BuildContext context, Dish dish) {
+    return Consumer<OrderProvider>(
+      builder: (context, orderProvider, _) {
+        final existingDish = orderProvider.selectedDishes[dish.id];
+        final quantity = existingDish?.quantity ?? 0;
+        
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+          child: ListTile(
+            leading: _getCategoryIcon(dish.category),
+            title: Text(dish.name),
+            subtitle: Text('€${dish.price.toStringAsFixed(2)} • ${dish.description ?? ''}'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                  onPressed: quantity > 0
+                      ? () => orderProvider.updateDishQuantity(dish, quantity - 1)
+                      : null,
+                ),
+                SizedBox(
+                  width: 20,
+                  child: Text(
+                    quantity > 0 ? '$quantity' : '0',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                  onPressed: () => orderProvider.addDish(dish),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
-  
-  Widget _getCategoryIcon(DishCategory category) {
-    switch (category) {
-      case DishCategory.primi:
-        return const Icon(Icons.lunch_dining);
-      case DishCategory.secondi:
-        return const Icon(Icons.restaurant);
-      case DishCategory.contorni:
-        return const Icon(Icons.grass);
-      case DishCategory.bevande:
-        return const Icon(Icons.local_drink);
-      case DishCategory.dessert:
-        return const Icon(Icons.cake);
+
+  Icon _getCategoryIcon(String category) {
+    final lowerCategory = category.toLowerCase();
+    
+    if (lowerCategory.contains('primo') || lowerCategory.contains('primi')) {
+      return const Icon(Icons.lunch_dining);
+    } else if (lowerCategory.contains('secondo') || lowerCategory.contains('secondi')) {
+      return const Icon(Icons.set_meal);
+    } else if (lowerCategory.contains('contorno') || lowerCategory.contains('contorni')) {
+      return const Icon(Icons.grass);
+    } else if (lowerCategory.contains('bevanda') || lowerCategory.contains('bevande')) {
+      return const Icon(Icons.local_drink);
+    } else if (lowerCategory.contains('dolce') || lowerCategory.contains('dessert')) {
+      return const Icon(Icons.cake);
+    } else if (lowerCategory.contains('antipasto') || lowerCategory.contains('antipasti')) {
+      return const Icon(Icons.restaurant_menu);
+    } else if (lowerCategory.contains('pizza')) {
+      return const Icon(Icons.local_pizza);
+    } else if (lowerCategory.contains('pane')) {
+      return const Icon(Icons.breakfast_dining);
     }
+    return const Icon(Icons.fastfood);
   }
 
   void _showOrderSummary(BuildContext context, OrderProvider orderProvider) {
+    if (orderProvider.totalItems == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Il carrello è vuoto')),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) {
-        return Consumer<OrderProvider>(
-          builder: (context, orderProvider, _) {
-            return DraggableScrollableSheet(
-              initialChildSize: 0.9,
-              minChildSize: 0.5,
-              maxChildSize: 0.9,
-              expand: false,
-              builder: (BuildContext context, ScrollController scrollController) {
-                final selectedDishes = orderProvider.selectedDishes.values.toList();
-                
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Il tuo ordine',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Totale: €${orderProvider.totalCost.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: selectedDishes.isEmpty
-                            ? const Center(
-                                child: Text('Nessun piatto selezionato'),
-                              )
-                            : ListView.builder(
-                                controller: scrollController,
-                                itemCount: selectedDishes.length,
-                                itemBuilder: (context, index) {
-                                  final dish = selectedDishes[index];
-                                  return Dismissible(
-                                    key: Key('${dish.name}-$index'),
-                                    direction: DismissDirection.endToStart,
-                                    background: Container(
-                                      color: Colors.red,
-                                      alignment: Alignment.centerRight,
-                                      padding: const EdgeInsets.only(right: 20),
-                                      child: const Icon(
-                                        Icons.delete,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    onDismissed: (direction) {
-                                      final removedDish = dish;
-                                      orderProvider.removeDish(dish.name);
-                                      
-                                      if (!context.mounted) return;
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('${dish.name} rimosso'),
-                                          action: SnackBarAction(
-                                            label: 'Annulla',
-                                            onPressed: () {
-                                              orderProvider.addDish(removedDish);
-                                            },
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: Card(
-                                      child: ListTile(
-                                        leading: _getCategoryIcon(dish.category),
-                                        title: Text(dish.name),
-                                        subtitle: Text(
-                                          '${dish.quantity} x €${dish.price.toStringAsFixed(2)} = '
-                                          '€${(dish.quantity * dish.price).toStringAsFixed(2)}',
-                                        ),
-                                        trailing: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(Icons.remove),
-                                              onPressed: () {
-                                                orderProvider.updateDishQuantity(
-                                                  dish,
-                                                  dish.quantity - 1,
-                                                );
-                                              },
-                                            ),
-                                            Text('${dish.quantity}'),
-                                            IconButton(
-                                              icon: const Icon(Icons.add),
-                                              onPressed: () {
-                                                orderProvider.addDish(dish);
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                      if (selectedDishes.isNotEmpty)
-                        Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.delete_outline),
-                                  label: const Text('Azzera ordine'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.red,
-                                    side: const BorderSide(color: Colors.red),
-                                  ),
-                                  onPressed: () {
-                                    orderProvider.clear();
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Ordine azzerato'),
-                                      ),
-                                    );
-                                    Navigator.pop(context);
-                                  },
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  final orderTotal = orderProvider.totalCost;
-                                  orderProvider.clear();
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Ordine inviato! Totale: €${orderTotal.toStringAsFixed(2)}'),
-                                    ),
-                                  );
-                                  Navigator.pop(context);
-                                },
-                                child: const Text('Conferma ordine'),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Riepilogo Ordine',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ...orderProvider.selectedDishes.entries.map((entry) {
+              final dish = entry.value;  // entry.value è già il piatto
+              final quantity = dish.quantity;
+              return ListTile(
+                leading: _getCategoryIcon(dish.category),
+                title: Text(dish.name),
+                subtitle: Text('€${dish.price.toStringAsFixed(2)} x $quantity'),
+                trailing: Text(
+                  '€${(dish.price * quantity).toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              );
+            }).toList(),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Totale:',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                );
-              },
-            );
-          },
-        );
-      },
+                  Text(
+                    '€${orderProvider.totalCost.toStringAsFixed(2)}',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    orderProvider.clear();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Ordine annullato')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Annulla Ordine'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final orderTotal = orderProvider.totalCost;
+                    orderProvider.clear();
+                    if (!context.mounted) return;
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Ordine inviato! Totale: €${orderTotal.toStringAsFixed(2)}'),
+                      ),
+                    );
+                  },
+                  child: const Text('Conferma Ordine'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
     );
   }
 }
