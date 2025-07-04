@@ -3,8 +3,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'models/dish.dart';
+import 'models/order.dart';
 import 'providers/order_provider.dart';
 import 'services/menu_service.dart';
+import 'services/order_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -286,6 +288,50 @@ class _OrderScreenState extends State<OrderScreen> {
     return const Icon(Icons.fastfood);
   }
 
+  Future<void> _confirmOrder(BuildContext context, OrderProvider orderProvider, double orderTotal) async {
+    try {
+      final orderService = OrderService();
+      
+      // Crea l'ordine
+      final order = Order(
+        total: orderTotal,
+        items: orderProvider.selectedDishes.entries.map((entry) {
+          final dish = entry.value;
+          return OrderItem(
+            dishId: dish.id,
+            dishName: dish.name,
+            quantity: dish.quantity,
+            price: dish.price,
+          );
+        }).toList(),
+      );
+
+      // Salva l'ordine su Supabase
+      await orderService.saveOrder(order);
+      
+      // Svuota il carrello
+      orderProvider.clear();
+      
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ordine inviato con successo! ID: ${order.id}'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Errore durante il salvataggio dell\'ordine: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showOrderSummary(BuildContext context, OrderProvider orderProvider) {
     if (orderProvider.totalItems == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -294,83 +340,99 @@ class _OrderScreenState extends State<OrderScreen> {
       return;
     }
 
+    bool isSubmitting = false;
+    final orderTotal = orderProvider.totalCost;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Riepilogo Ordine',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            ...orderProvider.selectedDishes.entries.map((entry) {
-              final dish = entry.value;  // entry.value è già il piatto
-              final quantity = dish.quantity;
-              return ListTile(
-                leading: _getCategoryIcon(dish.category),
-                title: Text(dish.name),
-                subtitle: Text('€${dish.price.toStringAsFixed(2)} x $quantity'),
-                trailing: Text(
-                  '€${(dish.price * quantity).toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              );
-            }).toList(),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Totale:',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '€${orderProvider.totalCost.toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Container(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    orderProvider.clear();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Ordine annullato')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text('Annulla Ordine'),
+                const Text(
+                  'Riepilogo Ordine',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    final orderTotal = orderProvider.totalCost;
-                    orderProvider.clear();
-                    if (!context.mounted) return;
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Ordine inviato! Totale: €${orderTotal.toStringAsFixed(2)}'),
+                const SizedBox(height: 16),
+                ...orderProvider.selectedDishes.entries.map((entry) {
+                  final dish = entry.value;
+                  final quantity = dish.quantity;
+                  return ListTile(
+                    leading: _getCategoryIcon(dish.category),
+                    title: Text(dish.name),
+                    subtitle: Text('€${dish.price.toStringAsFixed(2)} x $quantity'),
+                    trailing: Text(
+                      '€${(dish.price * quantity).toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }).toList(),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Totale:',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                    );
-                  },
-                  child: const Text('Conferma Ordine'),
+                      Text(
+                        '€${orderTotal.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () {
+                              Navigator.pop(context);
+                              orderProvider.clear();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Ordine annullato')),
+                              );
+                            },
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      child: const Text('Annulla'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              setState(() => isSubmitting = true);
+                              await _confirmOrder(context, orderProvider, orderTotal);
+                              if (context.mounted) {
+                                setState(() => isSubmitting = false);
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text('Conferma Ordine'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
               ],
             ),
-            const SizedBox(height: 16),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
