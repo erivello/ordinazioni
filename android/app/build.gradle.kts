@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "come.sagra.ordinazioni"
+    namespace = "com.sagra.ordinazioni"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"  // Versione specifica richiesta dai plugin
 
