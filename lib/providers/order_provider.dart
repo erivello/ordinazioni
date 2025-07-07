@@ -4,11 +4,29 @@ import '../models/dish.dart';
 import '../models/order.dart';
 import '../services/order_service.dart';
 
-class OrderProvider extends ChangeNotifier {
+class OrderProvider with ChangeNotifier {
   final Map<String, Dish> _selectedDishes = {};
+  bool _isSaving = false;
+  final OrderService orderService = OrderService();
+  int _tableNumber = 1;
+  String? _orderNotes;
+
+  int get tableNumber => _tableNumber;
+  String? get orderNotes => _orderNotes;
+  bool get isSaving => _isSaving;
+
+  void updateTableNumber(int number) {
+    _tableNumber = number;
+    notifyListeners();
+  }
+
+  void updateOrderNotes(String? notes) {
+    _orderNotes = notes;
+    notifyListeners();
+  }
 
   Map<String, Dish> get selectedDishes => Map.unmodifiable(_selectedDishes);
-  
+
   // Restituisce il totale dell'ordine
   double get totalAmount {
     return _selectedDishes.values.fold(
@@ -83,15 +101,15 @@ class OrderProvider extends ChangeNotifier {
         (sum, dish) => sum + dish.quantity,
       );
 
-  // Svuota l'ordine
+  // Svuota l'ordine e resetta i campi
   void clearOrder() {
     _selectedDishes.clear();
+    _tableNumber = 1;  // Resetta a tavolo 1
+    _orderNotes = null;  // Cancella le note
     notifyListeners();
   }
 
   // Stato di caricamento
-  bool _isSaving = false;
-  bool get isSaving => _isSaving;
 
   // Notifica i listener che lo stato è cambiato
   void _notifyListeners() => notifyListeners();
@@ -128,6 +146,8 @@ class OrderProvider extends ChangeNotifier {
       final order = Order(
         total: totalAmount,
         items: orderItems,
+        tableNumber: _tableNumber,
+        notes: _orderNotes,
         status: 'pending',
       );
       

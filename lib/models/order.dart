@@ -5,6 +5,8 @@ class Order {
   final DateTime createdAt;
   final double total;
   final List<OrderItem> items;
+  final int tableNumber;
+  final String? notes;
   String? status; // es. 'pending', 'in_preparation', 'ready', 'completed'
 
   Order({
@@ -12,6 +14,8 @@ class Order {
     DateTime? createdAt,
     required this.total,
     required this.items,
+    required this.tableNumber,
+    this.notes,
     this.status = 'pending',
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
@@ -22,6 +26,8 @@ class Order {
       'created_at': createdAt.toIso8601String(),
       'total': total,
       'status': status,
+      'table_number': tableNumber,
+      'notes': notes,
       'items': items.map((item) => item.toJson()).toList(),
     };
   }
@@ -32,6 +38,8 @@ class Order {
       createdAt: DateTime.parse(json['created_at']),
       total: (json['total'] as num).toDouble(),
       status: json['status'],
+      tableNumber: json['table_number'] as int? ?? 0,
+      notes: json['notes'],
       items: (json['items'] as List)
           .map((item) => OrderItem.fromJson(item))
           .toList(),

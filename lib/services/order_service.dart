@@ -26,7 +26,8 @@ class OrderService {
       // Debug: stampa i dati che stiamo inviando
       debugPrint('Invio ordine con ${order.items.length} articoli');
       debugPrint('Dettagli ordine: ${order.toJson()}');
-      debugPrint('Articoli: $itemsJson');
+      debugPrint('Numero tavolo: ${order.tableNumber}');
+      debugPrint('Note: ${order.notes}');
       
       // Verifica la connessione a Supabase
       if (_supabase.auth.currentUser == null) {
@@ -39,6 +40,8 @@ class OrderService {
           'p_order_id': order.id,
           'p_total': order.total,
           'p_status': order.status ?? 'pending',
+          'p_table_number': order.tableNumber,
+          'p_notes': order.notes,
           'p_items': itemsJson,
         });
         
