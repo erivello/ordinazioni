@@ -253,16 +253,17 @@ class _PaymentScreenState extends State<PaymentScreen> with AutomaticKeepAliveCl
                                                 if (mounted) {
                                                   Navigator.of(context).pop();
                                                   
-                                                  // Torna alla schermata precedente con un risultato
-                                                  Navigator.of(context).pop(true);
-                                                  
-                                                  // Mostra un messaggio di conferma
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text('Pagamento registrato con successo!'),
-                                                      backgroundColor: Colors.green,
-                                                    ),
-                                                  );
+                                                  // Torna al menu principale
+                                                Navigator.of(context).popUntil((route) => route.isFirst);
+                                                
+                                                // Mostra un messaggio di conferma
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Pagamento registrato con successo!'),
+                                                    backgroundColor: Colors.green,
+                                                    duration: Duration(seconds: 3),
+                                                  ),
+                                                );
                                                 }
                                               } catch (e) {
                                                 if (mounted) {
