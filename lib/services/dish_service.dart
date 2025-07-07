@@ -32,19 +32,46 @@ class DishService with ChangeNotifier {
       // Mappiamo i dati in oggetti Dish
       final dishes = (data as List).map((json) => Dish.fromJson(json)).toList();
       
-      // Ordiniamo le categorie nell'ordine specificato
-      const categoryOrder = {
-        'primi': 1,
-        'secondi': 2,
-        'contorni': 3,
-        'bevande': 4,
-        'dessert': 5,
+      // Log per verificare le categorie prima dell'ordinamento
+      debugPrint('Categorie prima dell\'ordinamento:');
+      for (var dish in dishes) {
+        debugPrint('- ${dish.name}: ${dish.category}');
+      }
+      
+      // Definiamo l'ordine delle categorie
+      const categoryOrder = [
+        'primi',
+        'secondi',
+        'contorni',
+        'bevande',
+        'dessert',
+      ];
+      
+      // Mappa per le varianti dei nomi delle categorie
+      const categoryVariants = {
+        'primi': ['primo', 'primi'],
+        'secondi': ['secondo', 'secondi'],
+        'contorni': ['contorno', 'contorni'],
+        'bevande': ['bevanda', 'bevande'],
+        'dessert': ['dolce', 'dolci', 'dessert'],
       };
+      
+      // Funzione per ottenere l'ordine di una categoria
+      int getCategoryOrder(String category) {
+        final cat = category.toLowerCase().trim();
+        for (int i = 0; i < categoryOrder.length; i++) {
+          final variants = categoryVariants[categoryOrder[i]]!;
+          if (variants.any((v) => v == cat)) {
+            return i;
+          }
+        }
+        return 999; // Categorie non riconosciute vanno in fondo
+      }
       
       // Ordiniamo prima per categoria e poi per nome
       dishes.sort((a, b) {
-        final aOrder = categoryOrder[a.category.toLowerCase()] ?? 999;
-        final bOrder = categoryOrder[b.category.toLowerCase()] ?? 999;
+        final aOrder = getCategoryOrder(a.category);
+        final bOrder = getCategoryOrder(b.category);
         
         if (aOrder != bOrder) {
           return aOrder.compareTo(bOrder);
@@ -53,8 +80,29 @@ class DishService with ChangeNotifier {
         return a.name.compareTo(b.name);
       });
       
-      _dishes = dishes;
+      // Log per verificare l'ordinamento
+      debugPrint('Categorie dopo l\'ordinamento:');
+      for (var dish in dishes) {
+        debugPrint('- ${dish.name}: ${dish.category}');
+      }
+      
+      // Verifichiamo se l'ordine è cambiato
+      bool orderChanged = _dishes.length != dishes.length;
+      if (!orderChanged) {
+        for (int i = 0; i < _dishes.length; i++) {
+          if (_dishes[i].id != dishes[i].id) {
+            orderChanged = true;
+            break;
+          }
+        }
+      }
+      
+      debugPrint('Ordine cambiato: $orderChanged');
+      
+      _dishes = List.from(dishes); // Creiamo una nuova lista per forzare il refresh
       notifyListeners();
+      
+      debugPrint('Dopo notifyListeners()');
     } catch (e) {
       debugPrint('Errore durante il caricamento dei piatti: $e');
       rethrow;

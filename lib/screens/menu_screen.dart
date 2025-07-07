@@ -22,16 +22,51 @@ class _MenuScreenState extends State<MenuScreen> {
     dishService.getDishes();
   }
 
+  // Funzione per ottenere le categorie ordinate
+  Map<String, List<Dish>> getOrderedDishesByCategory(DishService dishService) {
+    final Map<String, List<Dish>> result = {};
+    
+    // Ordina i piatti per nome
+    final sortedDishes = List<Dish>.from(dishService.dishes)
+      ..sort((a, b) => a.name.compareTo(b.name));
+    
+    // Raggruppa i piatti per categoria
+    for (var dish in sortedDishes) {
+      result[dish.category] = [...result[dish.category] ?? [], dish];
+    }
+    
+    // Ordina le categorie
+    final orderedCategories = result.keys.toList()
+      ..sort((a, b) {
+        const categoryOrder = {
+          'primi': 1,
+          'secondi': 2,
+          'contorni': 3,
+          'bevande': 4,
+          'dessert': 5,
+        };
+        
+        final aOrder = categoryOrder[a.toLowerCase()] ?? 999;
+        final bOrder = categoryOrder[b.toLowerCase()] ?? 999;
+        return aOrder.compareTo(bOrder);
+      });
+    
+    // Crea una nuova mappa ordinata
+    final orderedResult = <String, List<Dish>>{};
+    for (var category in orderedCategories) {
+      orderedResult[category] = result[category]!;
+    }
+    
+    return orderedResult;
+  }
+
   @override
   Widget build(BuildContext context) {
     final dishService = Provider.of<DishService>(context);
     final orderProvider = Provider.of<OrderProvider>(context);
     
-    // Log per debug
-    for (var dish in dishService.dishes) {
-      debugPrint('Menu - Piatto: ${dish.name}, Disponibile: ${dish.isAvailable}');
-    }
-    final dishesByCategory = dishService.dishesByCategory;
+    // Ottieni i piatti raggruppati per categoria e ordinati
+    final dishesByCategory = getOrderedDishesByCategory(dishService);
 
     return Scaffold(
       appBar: AppBar(
@@ -126,7 +161,23 @@ class _MenuScreenState extends State<MenuScreen> {
           : ListView.builder(
               itemCount: dishesByCategory.length,
               itemBuilder: (context, index) {
-                final category = dishesByCategory.keys.elementAt(index);
+                // Ottieni le categorie ordinate
+                final categories = dishesByCategory.keys.toList()
+                  ..sort((a, b) {
+                    const categoryOrder = {
+                      'primi': 1,
+                      'secondi': 2,
+                      'contorni': 3,
+                      'bevande': 4,
+                      'dessert': 5,
+                    };
+                    
+                    final aOrder = categoryOrder[a.toLowerCase()] ?? 999;
+                    final bOrder = categoryOrder[b.toLowerCase()] ?? 999;
+                    return aOrder.compareTo(bOrder);
+                  });
+                
+                final category = categories[index];
                 final categoryDishes = dishesByCategory[category]!;
                     
                 return Column(
@@ -149,8 +200,9 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
+  // Metodo per ottenere il nome formattato della categoria
   String _getCategoryName(String category) {
-    switch (category) {
+    switch (category.toLowerCase()) {
       case 'antipasti':
         return 'ANTIPASTI';
       case 'primi':
@@ -167,6 +219,8 @@ class _MenuScreenState extends State<MenuScreen> {
         return category.toUpperCase();
     }
   }
+
+
 }
 
 class _DishItem extends StatelessWidget {
