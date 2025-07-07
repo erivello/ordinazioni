@@ -72,7 +72,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sagra di San Lorenzo',
+      title: 'Ordinazioni Sagra',
       theme: ThemeData(
         primarySwatch: Colors.green,
         useMaterial3: true,
