@@ -1,6 +1,6 @@
-# Food Order App
+# Ordinazioni Sagra
 
-Un'applicazione Flutter per la gestione degli ordini in un ristorante o sagra. L'app permette ai clienti di sfogliare il menù, selezionare i piatti desiderati e visualizzare il totale dell'ordine.
+Un'applicazione Flutter per la gestione degli ordini durante la sagra. L'app permette ai clienti di sfogliare il menù, selezionare i piatti desiderati e visualizzare il totale dell'ordine.
 
 ## Funzionalità
 
@@ -16,12 +16,28 @@ Un'applicazione Flutter per la gestione degli ordini in un ristorante o sagra. L
 - Dart SDK (versione >=2.17.0 <4.0.0)
 - Un account Supabase
 
+## Configurazione icone personalizzate
+
+Per generare le icone dell'applicazione:
+
+1. Crea una cartella `assets/icon/` nella radice del progetto
+2. Aggiungi un file `icon.png` (minimo 1024x1024px) nella cartella `assets/icon/`
+3. Installa le dipendenze necessarie:
+   ```bash
+   flutter pub get
+   ```
+4. Genera le icone per tutte le piattaforme:
+   ```bash
+   flutter pub run flutter_launcher_icons
+   ```
+5. Ricompila l'applicazione per vedere le modifiche
+
 ## Configurazione
 
 1. Clona il repository:
    ```bash
    git clone [URL_DEL_REPOSITORY]
-   cd food_order_app
+   cd ordinazioni_sagra
    ```
 
 2. Installa le dipendenze:
