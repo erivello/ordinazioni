@@ -32,11 +32,7 @@ class DishService with ChangeNotifier {
       // Mappiamo i dati in oggetti Dish
       final dishes = (data as List).map((json) => Dish.fromJson(json)).toList();
       
-      // Log per verificare le categorie prima dell'ordinamento
-      debugPrint('Categorie prima dell\'ordinamento:');
-      for (var dish in dishes) {
-        debugPrint('- ${dish.name}: ${dish.category}');
-      }
+      // Log di debug disabilitato per ridurre il rumore nella console
       
       // Definiamo l'ordine delle categorie
       const categoryOrder = [
@@ -80,24 +76,7 @@ class DishService with ChangeNotifier {
         return a.name.compareTo(b.name);
       });
       
-      // Log per verificare l'ordinamento
-      debugPrint('Categorie dopo l\'ordinamento:');
-      for (var dish in dishes) {
-        debugPrint('- ${dish.name}: ${dish.category}');
-      }
-      
-      // Verifichiamo se l'ordine è cambiato
-      bool orderChanged = _dishes.length != dishes.length;
-      if (!orderChanged) {
-        for (int i = 0; i < _dishes.length; i++) {
-          if (_dishes[i].id != dishes[i].id) {
-            orderChanged = true;
-            break;
-          }
-        }
-      }
-      
-      debugPrint('Ordine cambiato: $orderChanged');
+      // Verifica se l'ordine è cambiato (senza log)
       
       _dishes = List.from(dishes); // Creiamo una nuova lista per forzare il refresh
       notifyListeners();
