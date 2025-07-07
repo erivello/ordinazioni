@@ -1,9 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/dish_service.dart';
+import 'edit_dish_screen.dart';
 
 class AdminDishesScreen extends StatelessWidget {
   const AdminDishesScreen({super.key});
+
+  void _showDeleteConfirmation(
+      BuildContext context, String dishId, String dishName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Conferma eliminazione'),
+        content: Text('Sei sicuro di voler eliminare il piatto "$dishName"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop(); // Chiudi il dialog
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await context.read<DishService>().deleteDish(dishId);
+                if (context.mounted) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Piatto eliminato con successo'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Errore durante l\'eliminazione: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text(
+              'Elimina',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,6 +61,15 @@ class AdminDishesScreen extends StatelessWidget {
         title: const Text('Gestione Piatti'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const EditDishScreen(),
+              ),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => dishService.loadDishes(),
           ),
@@ -22,6 +78,12 @@ class AdminDishesScreen extends StatelessWidget {
       body: Consumer<DishService>(
         builder: (context, dishService, _) {
           final dishes = dishService.dishes;
+          
+          if (dishes.isEmpty) {
+            return const Center(
+              child: Text('Nessun piatto disponibile'),
+            );
+          }
           
           return ListView.builder(
             itemCount: dishes.length,
@@ -40,52 +102,43 @@ class AdminDishesScreen extends StatelessWidget {
                     ),
                   ),
                   subtitle: Text(
-                    '€${dish.price.toStringAsFixed(2)} • ${dish.category}',
+                    '€${dish.price.toStringAsFixed(2)} • ${dish.category}\n${dish.description ?? ''}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        dish.isAvailable ? 'Disponibile' : 'Non disponibile',
-                        style: TextStyle(
-                          color: dish.isAvailable ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.bold,
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditDishScreen(dish: dish),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () => _showDeleteConfirmation(
+                            context, dish.id, dish.name),
+                      ),
                       Switch(
                         value: dish.isAvailable,
                         onChanged: (value) async {
-                          try {
-                            await dishService.updateDishAvailability(dish.id, value);
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${dish.name}: ${value ? 'Disponibile' : 'Non disponibile'}'),
-                                  backgroundColor: value ? Colors.green : Colors.orange,
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            debugPrint('Errore durante l\'aggiornamento: $e');
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Errore durante l\'aggiornamento'),
-                                  backgroundColor: Colors.red,
-                                  action: SnackBarAction(
-                                    label: 'Riprova',
-                                    onPressed: () => dishService.updateDishAvailability(dish.id, value),
-                                  ),
-                                ),
-                              );
-                            }
+                          final updatedDish = dish.copyWith(isAvailable: value);
+                          await dishService.updateDish(updatedDish);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    '${dish.name}: ${value ? 'Disponibile' : 'Non disponibile'}'),
+                                backgroundColor:
+                                    value ? Colors.green : Colors.orange,
+                              ),
+                            );
                           }
                         },
-                        activeColor: Colors.green,
-                        activeTrackColor: Colors.green[200],
-                        inactiveThumbColor: Colors.red,
-                        inactiveTrackColor: Colors.red[200],
                       ),
                     ],
                   ),

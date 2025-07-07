@@ -22,6 +22,62 @@ class DishService with ChangeNotifier {
     _setupRealtimeUpdates();
   }
   
+  Future<void> addDish(Dish dish) async {
+    try {
+      await _supabase.from('dishes').insert({
+        'id': dish.id,
+        'name': dish.name,
+        'price': dish.price,
+        'category': dish.category,
+        'description': dish.description,
+        'image_url': dish.imageUrl,
+        'is_available': dish.isAvailable,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      
+      // Ricarica la lista dei piatti
+      await _loadDishes();
+    } catch (e) {
+      debugPrint('Errore durante l\'aggiunta del piatto: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateDish(Dish dish) async {
+    try {
+      await _supabase.from('dishes').update({
+        'name': dish.name,
+        'price': dish.price,
+        'category': dish.category,
+        'description': dish.description,
+        'image_url': dish.imageUrl,
+        'is_available': dish.isAvailable,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', dish.id);
+      
+      // Ricarica la lista dei piatti
+      await _loadDishes();
+    } catch (e) {
+      debugPrint('Errore durante l\'aggiornamento del piatto: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteDish(String dishId) async {
+    try {
+      await _supabase
+          .from('dishes')
+          .delete()
+          .eq('id', dishId);
+      
+      // Ricarica la lista dei piatti
+      await _loadDishes();
+    } catch (e) {
+      debugPrint('Errore durante l\'eliminazione del piatto: $e');
+      rethrow;
+    }
+  }
+
   Future<void> loadDishes() async {
     try {
       final data = await _supabase
