@@ -47,7 +47,14 @@ app.*.map.json
 .env
 
 # Icone generate
+android/app/src/android/res/drawable-*/ic_launcher_foreground.png
+android/app/src/android/res/mipmap-*/launcher_icon.*
+android/app/src/android/res/values/colors.xml
 android/app/src/main/res/mipmap-*/ic_launcher.png
 android/app/src/main/res/mipmap-*/ic_launcher_round.png
-ios/Runner/Assets.xcassets/AppIcon.appiconset/
+android/app/src/main/res/mipmap-*/launcher_icon.png
+android/app/src/main/res/values/colors.xml
+android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+ios/Runner/Assets.xcassets/AppIcon.appiconset
 assets/icon/
