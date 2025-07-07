@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/order_provider.dart';
+import '../services/dish_service.dart';
 import 'payment_screen.dart';
 
 class OrderSummaryScreen extends StatelessWidget {
@@ -19,7 +20,16 @@ class OrderSummaryScreen extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               // Ricarica i piatti disponibili
-              Navigator.pop(context); // Chiudi la schermata corrente
+              final dishService = context.read<DishService>();
+              dishService.getDishes();
+              
+              // Mostra un feedback all'utente
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Menu aggiornato'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
             },
           ),
         ],

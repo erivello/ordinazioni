@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../models/dish.dart';
+import '../models/order.dart';
+import '../services/order_service.dart';
 
 class OrderProvider extends ChangeNotifier {
   final Map<String, Dish> _selectedDishes = {};
@@ -86,11 +89,65 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Conferma il pagamento e svuota l'ordine
-  Future<void> confirmPayment() async {
-    // Qui potresti aggiungere la logica per salvare l'ordine nel database
-    await Future.delayed(const Duration(milliseconds: 500)); // Simula un'operazione asincrona
-    clearOrder();
+  // Stato di caricamento
+  bool _isSaving = false;
+  bool get isSaving => _isSaving;
+
+  // Notifica i listener che lo stato è cambiato
+  void _notifyListeners() => notifyListeners();
+
+  // Conferma il pagamento e salva l'ordine
+  Future<Order> confirmPayment() async {
+    if (_selectedDishes.isEmpty) {
+      throw Exception('Impossibile confermare un ordine vuoto');
+    }
+    
+    // Imposta lo stato di salvataggio
+    _isSaving = true;
+    _notifyListeners();
+    
+    try {
+      final orderService = OrderService();
+      
+      // Verifica la connessione a Supabase
+      final isConnected = await orderService.checkConnection();
+      if (!isConnected) {
+        throw Exception('Nessuna connessione al database. Verifica la tua connessione internet.');
+      }
+      
+      // Converti i piatti in OrderItem
+      final orderItems = _selectedDishes.values.map((dish) => OrderItem(
+        id: const Uuid().v4(),
+        dishId: dish.id,
+        dishName: dish.name,
+        quantity: dish.quantity,
+        price: dish.price,
+      )).toList();
+      
+      // Crea l'ordine
+      final order = Order(
+        total: totalAmount,
+        items: orderItems,
+        status: 'pending',
+      );
+      
+      // Salva l'ordine su Supabase
+      await orderService.saveOrder(order);
+      
+      // Svuota l'ordine locale
+      clearOrder();
+      
+      debugPrint('Ordine salvato con successo: ${order.id}');
+      
+      return order; // Restituisci l'ordine salvato
+    } catch (e) {
+      debugPrint('Errore durante il salvataggio dell\'ordine: $e');
+      rethrow;
+    } finally {
+      // Ripristina lo stato di salvataggio
+      _isSaving = false;
+      _notifyListeners();
+    }
   }
   
   // Verifica se un piatto è già nell'ordine

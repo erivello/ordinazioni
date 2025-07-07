@@ -23,7 +23,9 @@ class PaymentScreen extends StatefulWidget {
   State<PaymentScreen> createState() => _PaymentScreenState();
 }
 
-class _PaymentScreenState extends State<PaymentScreen> {
+class _PaymentScreenState extends State<PaymentScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   final _formKey = GlobalKey<FormState>();
   final _importoController = TextEditingController();
   Map<Decimal, int>? _resto;
@@ -36,6 +38,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final orderProvider = Provider.of<OrderProvider>(context, listen: false);
     _totale = orderProvider.totalAmount;
     _importoController.text = _totale.toStringAsFixed(2);
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Assicura che il widget venga mantenuto in memoria
+    updateKeepAlive();
   }
 
   @override
@@ -90,7 +99,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Deve essere chiamato per mantenere lo stato
+    super.build(context);
+    
+    return Consumer<OrderProvider>(
+      builder: (context, orderProvider, _) {
+        return WillPopScope(
+          onWillPop: () async {
+            // Previene la chiusura durante il salvataggio
+            return !orderProvider.isSaving;
+          },
+          child: Scaffold(
       appBar: AppBar(
         title: const Text('Pagamento'),
       ),
@@ -186,24 +205,107 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     style: TextStyle(fontSize: 16),
                   ),
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
+                Consumer<OrderProvider>(
+                  builder: (context, orderProvider, _) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        // Chiudi la tastiera se aperta
+                        FocusScope.of(context).unfocus();
+                        
+                        // Mostra un dialog di conferma
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text('Conferma Pagamento'),
+                              content: const Text('Confermi di aver ricevuto il pagamento?'),
+                              actions: <Widget>[
+                                TextButton(
+                                  child: const Text('Annulla'),
+                                  onPressed: () {
+                                    Navigator.of(context).pop(); // Chiudi il dialog
+                                  },
+                                ),
+                                Consumer<OrderProvider>(
+                                  builder: (context, orderProvider, _) {
+                                    return TextButton(
+                                      child: orderProvider.isSaving
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                              ),
+                                            )
+                                          : const Text('Conferma'),
+                                      onPressed: orderProvider.isSaving
+                                          ? null
+                                          : () async {
+                                              try {
+                                                // Chiudi la tastiera se aperta
+                                                FocusScope.of(context).unfocus();
+                                                
+                                                // Conferma il pagamento
+                                                await orderProvider.confirmPayment();
+                                                
+                                                // Chiudi il dialog
+                                                if (mounted) {
+                                                  Navigator.of(context).pop();
+                                                  
+                                                  // Torna alla schermata precedente con un risultato
+                                                  Navigator.of(context).pop(true);
+                                                  
+                                                  // Mostra un messaggio di conferma
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('Pagamento registrato con successo!'),
+                                                      backgroundColor: Colors.green,
+                                                    ),
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                if (mounted) {
+                                                  // Mostra un messaggio di errore
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text('Errore durante il salvataggio: $e'),
+                                                      backgroundColor: Colors.red,
+                                                    ),
+                                                  );
+                                                  
+                                                  // Chiudi il dialog
+                                                  Navigator.of(context).pop();
+                                                }
+                                              }
+                                            },
+                                    );
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text(
+                        'Conferma Pagamento',
+                        style: TextStyle(fontSize: 16, color: Colors.white),
+                      ),
+                    );
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text(
-                    'Conferma Pagamento',
-                    style: TextStyle(fontSize: 16, color: Colors.white),
-                  ),
                 ),
               ],
             ],
           ),
         ),
       ),
+          ),
+        );
+      },
     );
   }
 }
