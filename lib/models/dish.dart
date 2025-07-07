@@ -4,10 +4,12 @@ class Dish {
   final String id;
   final String name;
   final double price;
-  final String category; // Changed from DishCategory to String
+  final String category;
   final String? description;
   final String? imageUrl;
-  int quantity;
+  final bool isAvailable;
+  final int quantity;
+  final DateTime? updatedAt;
 
   Dish({
     String? id,
@@ -16,18 +18,23 @@ class Dish {
     required this.category,
     this.description,
     this.imageUrl,
-    this.quantity = 0,
+    this.quantity = 1,
+    this.isAvailable = true,
+    this.updatedAt,
   }) : id = id ?? const Uuid().v4();
 
   factory Dish.fromJson(Map<String, dynamic> json) {
     return Dish(
       id: json['id'] as String? ?? const Uuid().v4(),
-      name: json['name'] as String,
-      price: (json['price'] as num).toDouble(),
-      category: (json['category'] as String?)?.toLowerCase() ?? 'primi',
+      name: json['name'] as String? ?? 'Senza nome',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      category: json['category'] as String? ?? 'Altra',
       description: json['description'] as String?,
       imageUrl: json['image_url'] as String?,
-      quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+      isAvailable: json['is_available'] as bool? ?? true,
+      updatedAt: json['updated_at'] != null 
+          ? DateTime.tryParse(json['updated_at'] as String) 
+          : null,
     );
   }
 
@@ -40,6 +47,8 @@ class Dish {
       'description': description,
       'image_url': imageUrl,
       if (quantity > 0) 'quantity': quantity,
+      'is_available': isAvailable,
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 
@@ -51,6 +60,7 @@ class Dish {
     String? description,
     String? imageUrl,
     int? quantity,
+    bool? isAvailable,
   }) {
     return Dish(
       id: id ?? this.id,
@@ -60,6 +70,7 @@ class Dish {
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
       quantity: quantity ?? this.quantity,
+      isAvailable: isAvailable ?? this.isAvailable,
     );
   }
 

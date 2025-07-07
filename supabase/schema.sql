@@ -12,6 +12,9 @@ create table public.dishes (
 -- Abilita RLS (Row Level Security)
 alter table public.dishes enable row level security;
 
+ALTER TABLE public.dishes 
+ADD COLUMN is_available BOOLEAN DEFAULT true;
+
 -- Crea policy per permettere le query pubbliche
 create policy "Public dishes are viewable by everyone"
   on public.dishes for select
