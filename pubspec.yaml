@@ -47,6 +47,9 @@ dependencies:
   uuid: ^4.3.3
   intl: ^0.19.0  # For number and date formatting
   
+  # Decimal precision
+  decimal: ^3.2.4
+  
   # Network
   connectivity_plus: ^5.0.2
 

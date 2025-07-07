@@ -5,6 +5,14 @@ class OrderProvider extends ChangeNotifier {
   final Map<String, Dish> _selectedDishes = {};
 
   Map<String, Dish> get selectedDishes => Map.unmodifiable(_selectedDishes);
+  
+  // Restituisce il totale dell'ordine
+  double get totalAmount {
+    return _selectedDishes.values.fold(
+      0.0, 
+      (sum, dish) => sum + (dish.price * dish.quantity)
+    );
+  }
 
   // Restituisce la quantità di un piatto nell'ordine
   int getQuantity(Dish dish) {
@@ -73,9 +81,16 @@ class OrderProvider extends ChangeNotifier {
       );
 
   // Svuota l'ordine
-  void clear() {
+  void clearOrder() {
     _selectedDishes.clear();
     notifyListeners();
+  }
+
+  // Conferma il pagamento e svuota l'ordine
+  Future<void> confirmPayment() async {
+    // Qui potresti aggiungere la logica per salvare l'ordine nel database
+    await Future.delayed(const Duration(milliseconds: 500)); // Simula un'operazione asincrona
+    clearOrder();
   }
   
   // Verifica se un piatto è già nell'ordine

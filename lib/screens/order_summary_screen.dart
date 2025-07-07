@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/order_provider.dart';
+import 'payment_screen.dart';
 
 class OrderSummaryScreen extends StatelessWidget {
   const OrderSummaryScreen({super.key});
@@ -123,7 +124,7 @@ class OrderSummaryScreen extends StatelessWidget {
 
                         if (shouldCancel == true) {
                           if (context.mounted) {
-                            orderProvider.clear();
+                            orderProvider.clearOrder();
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -155,14 +156,11 @@ class OrderSummaryScreen extends StatelessWidget {
                     flex: 3,
                     child: ElevatedButton(
                       onPressed: () {
-                        // Invia l'ordine
-                        orderProvider.clear();
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Ordine inviato con successo!'),
-                            backgroundColor: Colors.green,
-                            duration: Duration(seconds: 2),
+                        // Naviga alla schermata di pagamento
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PaymentScreen(),
                           ),
                         );
                       },
