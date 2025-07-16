@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/menu_screen.dart';
 import 'screens/admin_dishes_screen.dart';
+import 'screens/dish_selection_screen.dart';
 import 'services/dish_service.dart';
 import 'services/order_service.dart';
 import 'providers/order_provider.dart';

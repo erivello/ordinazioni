@@ -38,6 +38,30 @@ class Dish {
     );
   }
 
+  Dish copyWith({
+    String? id,
+    String? name,
+    double? price,
+    String? category,
+    String? description,
+    String? imageUrl,
+    int? quantity,
+    bool? isAvailable,
+    DateTime? updatedAt,
+  }) {
+    return Dish(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      price: price ?? this.price,
+      category: category ?? this.category,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+      quantity: quantity ?? this.quantity,
+      isAvailable: isAvailable ?? this.isAvailable,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -50,28 +74,6 @@ class Dish {
       'is_available': isAvailable,
       'updated_at': updatedAt?.toIso8601String(),
     };
-  }
-
-  Dish copyWith({
-    String? id,
-    String? name,
-    double? price,
-    String? category,
-    String? description,
-    String? imageUrl,
-    int? quantity,
-    bool? isAvailable,
-  }) {
-    return Dish(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      price: price ?? this.price,
-      category: category ?? this.category,
-      description: description ?? this.description,
-      imageUrl: imageUrl ?? this.imageUrl,
-      quantity: quantity ?? this.quantity,
-      isAvailable: isAvailable ?? this.isAvailable,
-    );
   }
 
   @override

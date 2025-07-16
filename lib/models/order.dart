@@ -7,7 +7,7 @@ class Order {
   final List<OrderItem> items;
   final int tableNumber;
   final String? notes;
-  String? status; // es. 'pending', 'in_preparation', 'ready', 'completed'
+  String? status; // 'new', 'in_preparation', 'ready', 'completed', 'cancelled'
 
   Order({
     String? id,
@@ -16,7 +16,7 @@ class Order {
     required this.items,
     required this.tableNumber,
     this.notes,
-    this.status = 'pending',
+    this.status = 'new',
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now();
 
@@ -37,7 +37,7 @@ class Order {
       id: json['id'],
       createdAt: DateTime.parse(json['created_at']),
       total: (json['total'] as num).toDouble(),
-      status: json['status'],
+      status: json['status'] ?? 'new',
       tableNumber: json['table_number'] as int? ?? 0,
       notes: json['notes'],
       items: (json['items'] as List)
