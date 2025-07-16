@@ -52,7 +52,7 @@ class OrderService {
       final params = <String, dynamic>{
         'p_order_id': order.id,
         'p_total': order.total,
-        'p_status': order.status ?? 'pending',
+        'p_status': 'confirmed',  // Imposta sempre lo stato su 'confirmed'
         'p_table_number': order.tableNumber,
         'p_order_notes': order.notes ?? '',  // Invia una stringa vuota se notes è null
         'p_items': order.items.map((item) => {
