@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/dish.dart';
+import '../models/order_item.dart';
+import '../models/order.dart' show Order;
 import '../providers/order_provider.dart';
+import '../services/dish_service.dart';
 import 'order_summary_screen.dart';
 
 class DishSelectionScreen extends StatefulWidget {
@@ -12,91 +15,216 @@ class DishSelectionScreen extends StatefulWidget {
 }
 
 class _DishSelectionScreenState extends State<DishSelectionScreen> {
-  List<Dish> selectedDishes = [];
-  int _selectedTable = 1; // Aggiunto per gestire il numero del tavolo
-  List<Dish> availableDishes = [
-    Dish(
-      name: 'Pasta alla Norma',
-      price: 12.0,
-      category: 'Primi',
-    ),
-    Dish(
-      name: 'Arancini',
-      price: 6.0,
-      category: 'Antipasti',
-    ),
-    Dish(
-      name: 'Cannoli',
-      price: 4.0,
-      category: 'Dolci',
-    ),
-    // Add more dishes as needed
-  ];
-
-  double get totalCost {
-    return selectedDishes.fold(0.0, (sum, dish) => sum + dish.price * dish.quantity);
+  final List<Dish> _selectedDishes = [];
+  int _selectedTable = 1;
+  final TextEditingController _notesController = TextEditingController();
+  
+  void _proceedToCheckout() {
+    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+    
+    // Calcola il totale dei piatti selezionati
+    double total = 0;
+    final orderItems = <OrderItem>[];
+    
+    for (final dish in _selectedDishes) {
+      if (dish.quantity > 0) {
+        total += dish.price * dish.quantity;
+        orderItems.add(OrderItem(
+          dishId: dish.id,
+          dishName: dish.name,
+          dishPrice: dish.price,
+          dishCategory: dish.category,
+          quantity: dish.quantity,
+        ));
+      }
+    }
+    
+    // Crea l'ordine con i piatti selezionati
+    final order = Order(
+      total: total,
+      items: orderItems,
+      tableNumber: _selectedTable,
+      notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+    );
+    
+    // Imposta l'ordine nel provider
+    orderProvider.setOrder(order);
+    
+    // Naviga alla schermata di riepilogo
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const OrderSummaryScreen(),
+      ),
+    );
   }
 
-  void addDish(Dish dish) {
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Carica i piatti all'inizializzazione
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final dishService = context.read<DishService>();
+      dishService.loadDishes();
+    });
+  }
+
+  // Ottiene i piatti raggruppati per categoria
+  Map<String, List<Dish>> get dishesByCategory {
+    final dishService = context.watch<DishService>();
+    return dishService.dishesByCategory;
+  }
+  
+  // Calcola il costo totale
+  double get totalCost {
+    return _selectedDishes.fold(
+      0.0, 
+      (sum, dish) => sum + (dish.price * dish.quantity)
+    );
+  }
+
+  // Aggiunge un piatto all'ordine
+  void _addDish(Dish dish) {
     setState(() {
-      final existingDishIndex = selectedDishes.indexWhere((d) => d.id == dish.id);
+      final existingDishIndex = _selectedDishes.indexWhere((d) => d.id == dish.id);
       
       if (existingDishIndex == -1) {
-        selectedDishes.add(dish.copyWith(quantity: 1));
+        _selectedDishes.add(dish.copyWith(quantity: 1));
       } else {
-        final existingDish = selectedDishes[existingDishIndex];
-        selectedDishes[existingDishIndex] = existingDish.copyWith(
+        final existingDish = _selectedDishes[existingDishIndex];
+        _selectedDishes[existingDishIndex] = existingDish.copyWith(
           quantity: existingDish.quantity + 1
         );
       }
     });
   }
 
-  void removeDish(Dish dish) {
+  // Rimuove un piatto dall'ordine
+  void _removeDish(Dish dish) {
     setState(() {
-      final existingDishIndex = selectedDishes.indexWhere((d) => d.id == dish.id);
+      final existingDishIndex = _selectedDishes.indexWhere((d) => d.id == dish.id);
       
       if (existingDishIndex != -1) {
-        final existingDish = selectedDishes[existingDishIndex];
+        final existingDish = _selectedDishes[existingDishIndex];
         if (existingDish.quantity > 1) {
-          selectedDishes[existingDishIndex] = existingDish.copyWith(
+          _selectedDishes[existingDishIndex] = existingDish.copyWith(
             quantity: existingDish.quantity - 1
           );
         } else {
-          selectedDishes.removeAt(existingDishIndex);
+          _selectedDishes.removeAt(existingDishIndex);
         }
       }
     });
   }
+  
+  // Ottiene la quantità di un piatto nell'ordine
+  int _getDishQuantity(Dish dish) {
+    final existingDish = _selectedDishes.firstWhere(
+      (d) => d.id == dish.id,
+      orElse: () => dish.copyWith(quantity: 0),
+    );
+    return existingDish.quantity;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final orderProvider = context.watch<OrderProvider>();
+    final dishService = context.watch<DishService>();
+    
+    if (dishService.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Selezione Piatti'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.shopping_cart),
-            onPressed: () {
-              if (selectedDishes.isNotEmpty) {
-                // Aggiorna il numero del tavolo nel provider
-                final orderProvider = context.read<OrderProvider>();
-                orderProvider.updateTableNumber(_selectedTable);
-                
-                // Naviga alla schermata di riepilogo
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const OrderSummaryScreen(),
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_cart),
+                onPressed: _selectedDishes.isEmpty ? null : _proceedToCheckout,
+              ),
+              if (_selectedDishes.isNotEmpty)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      _selectedDishes.fold<int>(
+                        0, (sum, dish) => sum + dish.quantity).toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                );
-              }
-            },
+                ),
+            ],
           ),
         ],
       ),
       body: Column(
         children: [
+          // Selettore tavolo
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: DropdownButtonFormField<int>(
+              value: _selectedTable,
+              decoration: const InputDecoration(
+                labelText: 'Tavolo',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: List.generate(20, (index) => index + 1)
+                  .map((number) => DropdownMenuItem(
+                        value: number,
+                        child: Text('Tavolo $number'),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedTable = value;
+                  });
+                  orderProvider.updateTableNumber(value);
+                }
+              },
+            ),
+          ),
+          
+          // Note per l'ordine
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: TextFormField(
+              controller: _notesController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Note per la cucina (opzionale)',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+            ),
+          ),
+          
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(16),
@@ -106,10 +234,10 @@ class _DishSelectionScreenState extends State<DishSelectionScreen> {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),
-              itemCount: availableDishes.length,
+              itemCount: dishService.dishes.length,
               itemBuilder: (context, index) {
-                final dish = availableDishes[index];
-                final isSelected = selectedDishes.any((d) => d.id == dish.id);
+                final dish = dishService.dishes[index];
+                final isSelected = _selectedDishes.any((d) => d.id == dish.id);
 
                 return Card(
                   elevation: 4,
@@ -143,12 +271,12 @@ class _DishSelectionScreenState extends State<DishSelectionScreen> {
                                 children: [
                                   IconButton(
                                     icon: const Icon(Icons.remove),
-                                    onPressed: () => removeDish(dish),
+                                    onPressed: () => _removeDish(dish),
                                   ),
-                                  Text('${dish.quantity}'),
+                                  Text('${_getDishQuantity(dish)}'),
                                   IconButton(
                                     icon: const Icon(Icons.add),
-                                    onPressed: () => addDish(dish),
+                                    onPressed: () => _addDish(dish),
                                   ),
                                 ],
                               ),

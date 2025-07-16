@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/dish.dart';
-import '../models/order.dart';
+import '../models/order_item.dart';
+import '../models/order.dart' show Order;
 import '../services/order_service.dart';
 
 class OrderProvider with ChangeNotifier {
@@ -10,10 +11,12 @@ class OrderProvider with ChangeNotifier {
   final OrderService orderService = OrderService();
   int _tableNumber = 1;
   String? _orderNotes;
+  Order? _currentOrder;
 
   int get tableNumber => _tableNumber;
   String? get orderNotes => _orderNotes;
   bool get isSaving => _isSaving;
+  Order? get currentOrder => _currentOrder;
 
   void updateTableNumber(int number) {
     _tableNumber = number;
@@ -70,10 +73,72 @@ class OrderProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // Metodo alternativo per rimuovere un piatto
+  void removeDishAlternative(String dishId) {
+    debugPrint('=== RIMOZIONE ALTERNATIVA ===');
+    debugPrint('ID da rimuovere: "$dishId"');
+    
+    // Crea una nuova mappa senza il piatto da rimuovere
+    final newMap = Map<String, Dish>.from(_selectedDishes);
+    
+    // Prova a rimuovere l'ID in vari modi
+    final wasRemoved = newMap.remove(dishId) != null;
+    
+    if (wasRemoved) {
+      // Aggiorna la mappa esistente
+      _selectedDishes.clear();
+      _selectedDishes.addAll(newMap);
+      
+      debugPrint('✅ Piatto rimosso con successo (metodo alternativo)');
+      debugPrint('Nuovi piatti: ${_selectedDishes.keys}');
+      notifyListeners();
+    } else {
+      debugPrint('❌ Impossibile rimuovere il piatto con ID: $dishId');
+      debugPrint('Piatti attuali: ${_selectedDishes.keys}');
+    }
+  }
+  
   // Rimuove completamente un piatto dall'ordine
-  void removeDish(String dishId) {
-    _selectedDishes.remove(dishId);
-    notifyListeners();
+  bool removeDish(String dishId) {
+    try {
+      debugPrint('=== RIMOZIONE PIATTO ===');
+      debugPrint('ID da rimuovere: "$dishId" (tipo: ${dishId.runtimeType}, lunghezza: ${dishId.length})');
+      
+      // Stampa tutti gli ID presenti per il debug
+      debugPrint('ID presenti nella mappa:');
+      for (final id in _selectedDishes.keys) {
+        debugPrint('- "$id" (tipo: ${id.runtimeType}, lunghezza: ${id.length})');
+      }
+      
+      // Prova a rimuovere l'ID esatto
+      if (_selectedDishes.containsKey(dishId)) {
+        debugPrint('✅ Trovato corrispondenza esatta, rimozione in corso...');
+        _selectedDishes.remove(dishId);
+        debugPrint('✅ Piatto rimosso con successo');
+        notifyListeners();
+        return true;
+      }
+      
+      // Se non trovato, prova a rimuovere senza considerare maiuscole/minuscole
+      final matchingKey = _selectedDishes.keys.firstWhere(
+        (key) => key.toString().toLowerCase() == dishId.toLowerCase(),
+        orElse: () => '',
+      );
+      
+      if (matchingKey.isNotEmpty) {
+        debugPrint('✅ Trovata corrispondenza case-insensitive, rimozione in corso...');
+        _selectedDishes.remove(matchingKey);
+        debugPrint('✅ Piatto rimosso con successo (case-insensitive)');
+        notifyListeners();
+        return true;
+      }
+      
+      debugPrint('❌ Nessuna corrispondenza trovata per l\'ID: $dishId');
+      return false;
+    } catch (e) {
+      debugPrint('Errore durante la rimozione del piatto: $e');
+      return false;
+    }
   }
 
   // Aggiunge un piatto all'ordine
@@ -94,6 +159,30 @@ class OrderProvider with ChangeNotifier {
         0.0,
         (sum, dish) => sum + (dish.price * dish.quantity),
       );
+
+  // Imposta l'ordine corrente
+  void setOrder(Order order) {
+    _currentOrder = order;
+    _selectedDishes.clear();
+    
+    for (final item in order.items) {
+      // Crea un nuovo piatto con i dati dall'ordine
+      final dish = Dish(
+        id: item.dishId,
+        name: item.dishName,
+        price: item.dishPrice,
+        category: item.dishCategory ?? 'Generico',
+        isAvailable: true,
+        description: item.notes ?? '',
+      );
+      
+      _selectedDishes[item.dishId] = dish.copyWith(quantity: item.quantity);
+    }
+    
+    _tableNumber = order.tableNumber;
+    _orderNotes = order.notes;
+    notifyListeners();
+  }
 
   // Conta il numero totale di articoli nell'ordine
   int get totalItems => _selectedDishes.values.fold(
@@ -138,8 +227,9 @@ class OrderProvider with ChangeNotifier {
         id: const Uuid().v4(),
         dishId: dish.id,
         dishName: dish.name,
+        dishPrice: dish.price,
         quantity: dish.quantity,
-        price: dish.price,
+        dishCategory: dish.category,
       )).toList();
       
       // Crea l'ordine

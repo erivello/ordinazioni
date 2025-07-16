@@ -33,7 +33,13 @@ class OrderSummaryScreenState extends State<OrderSummaryScreen> {
   @override
   Widget build(BuildContext context) {
     final orderProvider = context.watch<OrderProvider>();
+    // Usiamo un ValueKey per forzare il rebuild della ListView quando i piatti cambiano
     final orderItems = orderProvider.selectedDishes.values.toList();
+    final listKey = ValueKey('order-items-${orderItems.length}');
+    
+    debugPrint('=== BUILD ORDER SUMMARY ===');
+    debugPrint('Numero di piatti: ${orderItems.length}');
+    debugPrint('Chiavi dei piatti: ${orderProvider.selectedDishes.keys}');
     
     return Scaffold(
       appBar: AppBar(
@@ -117,28 +123,84 @@ class OrderSummaryScreenState extends State<OrderSummaryScreen> {
                       ),
                     )
                   : ListView.builder(
+                      key: listKey,
                       itemCount: orderItems.length,
                       itemBuilder: (context, index) {
                         final item = orderItems[index];
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          child: ListTile(
-                            title: Text(
-                              item.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Row(
+                              children: [
+                                // Pulsante di eliminazione
+                                InkWell(
+                                  onTap: () {
+                                    debugPrint('=== TAP DETECTED ===');
+                                    debugPrint('Rimozione piatto:');
+                                    debugPrint('- ID: ${item.id} (tipo: ${item.id.runtimeType})');
+                                    debugPrint('- Nome: ${item.name}');
+                                    debugPrint('Stato PRIMA della rimozione:');
+                                    debugPrint('- Piatti nel provider: ${orderProvider.selectedDishes.keys}');
+                                    
+                                    // Usa il metodo alternativo di rimozione
+                                    orderProvider.removeDishAlternative(item.id);
+                                    
+                                    // Forza il rebuild esplicito
+                                    setState(() {});
+                                    
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Aggiornamento ordine in corso...'),
+                                        duration: Duration(seconds: 1),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                                    ),
+                                    child: const Icon(Icons.delete, color: Colors.red, size: 24),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Dettagli del piatto
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Quantità: ${item.quantity}',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Prezzo
+                                Text(
+                                  '€${(item.price * item.quantity).toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
                             ),
-                            subtitle: Text('Quantità: ${item.quantity}'),
-                            trailing: Text(
-                              '€${(item.price * item.quantity).toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.green,
-                              ),
-                            ),
-                            onTap: () {
-                              // Opzionale: permettere di modificare la quantità
-                            },
                           ),
                         );
                       },

@@ -126,17 +126,28 @@ class AdminDishesScreen extends StatelessWidget {
                       Switch(
                         value: dish.isAvailable,
                         onChanged: (value) async {
-                          final updatedDish = dish.copyWith(isAvailable: value);
-                          await dishService.updateDish(updatedDish);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                    '${dish.name}: ${value ? 'Disponibile' : 'Non disponibile'}'),
-                                backgroundColor:
-                                    value ? Colors.green : Colors.orange,
-                              ),
-                            );
+                          try {
+                            await dishService.updateDishAvailability(dish.id, value);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      '${dish.name}: ${value ? 'Disponibile' : 'Non disponibile'}'),
+                                  backgroundColor:
+                                      value ? Colors.green : Colors.orange,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Errore durante l\'aggiornamento della disponibilità'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                            // Lo stato verrà automaticamente aggiornato dal DishService tramite notifyListeners
                           }
                         },
                       ),

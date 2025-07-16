@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'order_item.dart';
 
 class Order {
   final String id;
@@ -47,41 +48,4 @@ class Order {
   }
 }
 
-class OrderItem {
-  final String id;
-  final String dishId;
-  final String dishName;
-  final int quantity;
-  final double price;
-  final String? notes;
-
-  OrderItem({
-    String? id,
-    required this.dishId,
-    required this.dishName,
-    required this.quantity,
-    required this.price,
-    this.notes,
-  }) : id = id ?? const Uuid().v4();
-
-  Map<String, dynamic> toJson() {
-    return {
-      'dishId': dishId,  // Modificato per corrispondere alla funzione SQL
-      'dishName': dishName,
-      'quantity': quantity,
-      'price': price,
-      'notes': notes,
-    };
-  }
-
-  factory OrderItem.fromJson(Map<String, dynamic> json) {
-    return OrderItem(
-      id: json['id'],
-      dishId: json['dish_id'],
-      dishName: json['dish_name'],
-      quantity: json['quantity'],
-      price: (json['price'] as num).toDouble(),
-      notes: json['notes'],
-    );
-  }
-}
+// OrderItem model has been moved to order_item.dart
