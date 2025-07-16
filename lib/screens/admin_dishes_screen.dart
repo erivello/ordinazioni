@@ -138,7 +138,7 @@ class AdminDishesScreen extends StatelessWidget {
                                 ),
                               );
                             }
-                          } catch (e) {
+                          } catch (_) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -147,7 +147,6 @@ class AdminDishesScreen extends StatelessWidget {
                                 ),
                               );
                             }
-                            // Lo stato verrà automaticamente aggiornato dal DishService tramite notifyListeners
                           }
                         },
                       ),

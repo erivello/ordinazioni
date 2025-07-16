@@ -50,28 +50,19 @@ class DishService with ChangeNotifier {
       debugPrint('=== TENTATIVO DI ELIMINAZIONE PIATTO ===');
       debugPrint('ID piatto da eliminare: $dishId');
       
-      // Controlla se il piatto esiste nella lista locale
-      debugPrint('Verifica esistenza piatto nella lista locale...');
       final existingDish = _dishes.firstWhereOrNull((d) => d.id == dishId);
       if (existingDish == null) {
-        debugPrint('ATTENZIONE: Piatto con ID $dishId non trovato nella lista locale');
-        debugPrint('Piatti presenti: ${_dishes.map((d) => '${d.id} (${d.name})').toList()}');
         return false;
-      } else {
-        debugPrint('Piatto trovato: ${existingDish.name} (${existingDish.id})');
       }
       
       // Primo tentativo: eliminazione diretta
-      debugPrint('\n⚡ Tentativo di ELIMINAZIONE DIRETTA del piatto...');
       try {
-        final deleteResponse = await _supabase
+        await _supabase
             .from('dishes')
             .delete()
             .eq('id', dishId);
-        
-        debugPrint('Risposta eliminazione: $deleteResponse');
-        
-        // Verifica se il piatto è stato effettivamente eliminato
+            
+        // Verifica se il piatto è stato effettivamente rimosso
         final checkDish = await _supabase
             .from('dishes')
             .select()
@@ -79,73 +70,25 @@ class DishService with ChangeNotifier {
             .maybeSingle();
             
         if (checkDish == null) {
-          debugPrint('✅ Piatto rimosso con successo dal database');
-          // Aggiorna la lista locale
           _dishes.removeWhere((d) => d.id == dishId);
           notifyListeners();
           return true;
-        } else {
-          debugPrint('❌ Il piatto è ancora presente dopo l\'eliminazione');
-          debugPrint('Procedo con un approccio alternativo...');
         }
       } catch (e) {
-        debugPrint('Errore durante l\'eliminazione diretta: $e');
+        // Continua con il prossimo approccio in caso di errore
       }
       
       // Secondo tentativo: disabilitazione
-      debugPrint('\n⚡ Tentativo di DISABILITAZIONE del piatto...');
       try {
-        final updateResponse = await _supabase.rpc('disable_dish', params: {'dish_id': dishId});
-        debugPrint('Risposta disabilitazione: $updateResponse');
-        
-        // Verifica se il piatto è stato disabilitato
-        final disabledDish = await _supabase
-            .from('dishes')
-            .select()
-            .eq('id', dishId)
-            .single();
-            
-        if (disabledDish['is_available'] == false) {
-          debugPrint('✅ Piatto disabilitato con successo');
-          await _loadDishes(); // Ricarica la lista completa
-          return true;
-        } else {
-          debugPrint('❌ Impossibile disabilitare il piatto');
-        }
+        await _supabase.rpc('disable_dish', params: {'dish_id': dishId});
+        await _loadDishes();
+        return true;
       } catch (e) {
-        debugPrint('Errore durante la disabilitazione: $e');
+        await _loadDishes();
+        return !_dishes.any((d) => d.id == dishId);
       }
       
-      // Se siamo qui, entrambi i tentativi hanno fallito
-      debugPrint('\n❌ Tutti i tentativi di eliminazione/disabilitazione hanno fallito');
-      debugPrint('Motivi possibili:');
-      debugPrint('1. Vincoli di chiave esterna nel database');
-      debugPrint('2. Trigger che impediscono l\'aggiornamento/eliminazione');
-      debugPrint('3. Problemi con i permessi RLS');
-      
-      // Ricarica la lista per assicurarci di avere i dati aggiornati
-      await _loadDishes();
-      
-      // Verifica se il piatto è ancora presente
-      final stillExists = _dishes.any((d) => d.id == dishId);
-      debugPrint('Il piatto è ancora presente nella lista: $stillExists');
-      
-      return !stillExists;
-      
-    } catch (e, stackTrace) {
-      debugPrint('ERRORE CRITICO durante l\'eliminazione del piatto:');
-      debugPrint('Tipo di errore: ${e.runtimeType}');
-      debugPrint('Messaggio: $e');
-      debugPrint('Stack trace: $stackTrace');
-      
-      if (e is PostgrestException) {
-        debugPrint('Dettagli errore Supabase:');
-        debugPrint('- Messaggio: ${e.message}');
-        debugPrint('- Dettagli: ${e.details}');
-        debugPrint('- Hint: ${e.hint}');
-        debugPrint('- Codice: ${e.code}');
-      }
-      
+    } catch (e) {
       rethrow;
     }
   }
@@ -325,18 +268,13 @@ class DishService with ChangeNotifier {
   // Aggiorna la disponibilità di un piatto
   Future<void> updateDishAvailability(String id, bool isAvailable) async {
     try {
-      debugPrint('🔄 Aggiornamento disponibilità piatto: $id a $isAvailable');
-      
-      // Aggiornamento diretto
-      final response = await _supabase
+      await _supabase
           .from('dishes')
           .update({
             'is_available': isAvailable,
             'updated_at': DateTime.now().toIso8601String(),
           })
           .eq('id', id);
-
-      debugPrint('✅ Risposta aggiornamento: $response');
       
       // Aggiorna lo stato locale
       final index = _dishes.indexWhere((d) => d.id == id);
@@ -344,19 +282,13 @@ class DishService with ChangeNotifier {
         _dishes[index] = _dishes[index].copyWith(
           isAvailable: isAvailable,
         );
-        debugPrint('✅ Stato locale aggiornato');
       } else {
-        debugPrint('⚠️ Piatto non trovato nella lista locale, ricarico...');
         await _loadDishes();
       }
       
-      // Notifica i listener del cambiamento
       notifyListeners();
       
     } catch (e) {
-      debugPrint('❌ Errore durante l\'aggiornamento della disponibilità:');
-      debugPrint('Tipo: ${e.runtimeType}');
-      debugPrint('Messaggio: $e');
       rethrow;
     }
   }

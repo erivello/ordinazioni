@@ -203,8 +203,6 @@ class _MenuScreenState extends State<MenuScreen> {
   // Metodo per ottenere il nome formattato della categoria
   String _getCategoryName(String category) {
     switch (category.toLowerCase()) {
-      case 'antipasti':
-        return 'ANTIPASTI';
       case 'primi':
         return 'PRIMI PIATTI';
       case 'secondi':

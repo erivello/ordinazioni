@@ -22,7 +22,6 @@ class _EditDishScreenState extends State<EditDishScreen> {
   String? _imageUrl;
 
   final List<String> _categories = [
-    'antipasti',
     'primi',
     'secondi',
     'contorni',
