@@ -213,6 +213,8 @@ class _MenuScreenState extends State<MenuScreen> {
         return 'BEVANDE';
       case 'dessert':
         return 'DOLCI';
+      case 'altro':
+        return 'ALTRO';
       default:
         return category.toUpperCase();
     }

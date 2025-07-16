@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/order.dart';
@@ -20,42 +21,71 @@ class OrderService {
   // Salva un nuovo ordine
   Future<void> saveOrder(Order order) async {
     try {
-      // Converti gli OrderItem in una lista di mappe
-      final itemsJson = order.items.map((item) => item.toJson()).toList();
+      // Verifica che tutti gli articoli abbiano un ID piatto valido
+      for (final item in order.items) {
+        if (item.dishId.isEmpty) {
+          throw Exception('ID piatto mancante per l\'articolo: ${item.dishName}');
+        }
+      }
       
       // Debug: stampa i dati che stiamo inviando
+      debugPrint('=== BUILD ORDER SUMMARY ===');
+      debugPrint('Numero di piatti: ${order.items.length}');
+      debugPrint('Chiavi dei piatti: (${order.items.map((i) => i.dishId).join(', ')})');
+      
+      // Verifica la connessione a Supabase
+      final isConnected = await checkConnection();
+      if (!isConnected) {
+        throw Exception('Nessuna connessione a Supabase');
+      }
+      
+      if (_supabase.auth.currentUser == null) {
+        debugPrint('Nessun utente autenticato. Accesso anonimo in corso...');
+      }
+      
       debugPrint('Invio ordine con ${order.items.length} articoli');
       debugPrint('Dettagli ordine: ${order.toJson()}');
       debugPrint('Numero tavolo: ${order.tableNumber}');
       debugPrint('Note: ${order.notes}');
       
-      // Verifica la connessione a Supabase
-      if (_supabase.auth.currentUser == null) {
-        debugPrint('Nessun utente autenticato. Accesso anonimo in corso...');
+      // Prepara i parametri per la chiamata RPC
+      final params = <String, dynamic>{
+        'p_order_id': order.id,
+        'p_total': order.total,
+        'p_status': order.status ?? 'pending',
+        'p_table_number': order.tableNumber,
+        'p_order_notes': order.notes ?? '',  // Invia una stringa vuota se notes è null
+        'p_items': order.items.map((item) => {
+          'dishId': item.dishId,
+          'dishName': item.dishName,
+          'dishPrice': item.dishPrice,
+          'quantity': item.quantity,
+          'notes': item.notes,
+        }).toList(),
+      };
+      
+      // Log dettagliato per il debug
+      debugPrint('=== PARAMETRI ORDINE ===');
+      debugPrint('ID Ordine: ${order.id}');
+      debugPrint('Totale: ${order.total}');
+      debugPrint('Stato: ${order.status ?? 'pending'}');
+      debugPrint('Tavolo: ${order.tableNumber}');
+      debugPrint('Note: ${order.notes ?? 'Nessuna nota'}');
+      debugPrint('=== ARTICOLI ===');
+      for (var i = 0; i < order.items.length; i++) {
+        final item = order.items[i];
+        debugPrint('Articolo ${i + 1}:');
+        debugPrint('  dishId: ${item.dishId}');
+        debugPrint('  dishName: ${item.dishName}');
+        debugPrint('  dishPrice: ${item.dishPrice}');
+        debugPrint('  quantity: ${item.quantity}');
+        debugPrint('  notes: ${item.notes}');
       }
       
-      // Salva l'ordine
-      try {
-        final response = await _supabase.rpc('create_order_with_items', params: {
-          'p_order_id': order.id,
-          'p_total': order.total,
-          'p_status': order.status ?? 'pending',
-          'p_table_number': order.tableNumber,
-          'p_notes': order.notes,
-          'p_items': itemsJson,
-        });
-        
-        debugPrint('Ordine salvato con successo: $response');
-      } on PostgrestException catch (e) {
-        debugPrint('Errore Postgrest: ${e.message}');
-        debugPrint('Dettagli: ${e.details}');
-        debugPrint('Hint: ${e.hint}');
-        debugPrint('Codice: ${e.code}');
-        rethrow;
-      } catch (e) {
-        debugPrint('Errore durante la chiamata RPC: $e');
-        rethrow;
-      }
+      // Usa una transazione di Supabase
+      await _supabase.rpc('create_order_with_items', params: params);
+      
+      debugPrint('Ordine salvato con successo: ${order.id}');
     } catch (e, stackTrace) {
       debugPrint('Errore durante il salvataggio dell\'ordine: $e');
       debugPrint('Stack trace: $stackTrace');
