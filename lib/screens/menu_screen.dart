@@ -26,9 +26,13 @@ class _MenuScreenState extends State<MenuScreen> {
   Map<String, List<Dish>> getOrderedDishesByCategory(DishService dishService) {
     final Map<String, List<Dish>> result = {};
     
-    // Ordina i piatti per nome
+    // Ordina i piatti prima per sortOrder (crescente) e poi per nome
     final sortedDishes = List<Dish>.from(dishService.dishes)
-      ..sort((a, b) => a.name.compareTo(b.name));
+      ..sort((a, b) {
+        final orderComparison = a.sortOrder.compareTo(b.sortOrder);
+        if (orderComparison != 0) return orderComparison;
+        return a.name.compareTo(b.name); // Se sortOrder è uguale, ordina per nome
+      });
     
     // Raggruppa i piatti per categoria
     for (var dish in sortedDishes) {

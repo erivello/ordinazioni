@@ -34,6 +34,7 @@ class DishService with ChangeNotifier {
         'description': dish.description,
         'image_url': dish.imageUrl,
         'is_available': dish.isAvailable,
+        'sort_order': dish.sortOrder,
         'updated_at': DateTime.now().toIso8601String(),
       });
       
@@ -95,20 +96,134 @@ class DishService with ChangeNotifier {
 
   Future<void> updateDish(Dish dish) async {
     try {
-      await _supabase.from('dishes').update({
-        'name': dish.name,
-        'price': dish.price,
-        'category': dish.category,
-        'description': dish.description,
-        'image_url': dish.imageUrl,
-        'is_available': dish.isAvailable,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', dish.id);
+      debugPrint('=== INIZIO AGGIORNAMENTO PIATTO ===');
+      debugPrint('ID piatto: ${dish.id}');
       
-      // Ricarica la lista dei piatti
+      // Prova con una query SQL diretta
+      try {
+        final response = await _supabase.rpc('update_dish_direct', params: {
+          'p_id': dish.id,
+          'p_name': dish.name,
+          'p_price': dish.price,
+          'p_category': dish.category,
+          'p_description': dish.description ?? '',
+          'p_image_url': dish.imageUrl,
+          'p_is_available': dish.isAvailable,
+          'p_sort_order': dish.sortOrder,
+        });
+        
+        debugPrint('Risposta da update_dish_direct: $response');
+        await _loadDishes();
+        debugPrint('=== FINE AGGIORNAMENTO PIATTO ===');
+        return;
+      } catch (e) {
+        debugPrint('Errore in update_dish_direct: $e');
+      }
+      
+      // Se arriviamo qui, il metodo diretto ha fallito, proviamo il metodo normale
+      debugPrint('Tentativo con metodo normale...');
+      
+      // Prima verifichiamo se il piatto esiste
+      final existingDish = await _supabase
+          .from('dishes')
+          .select()
+          .eq('id', dish.id)
+          .single()
+          .catchError((error) {
+            debugPrint('Errore nel recupero del piatto: $error');
+            return null;
+          });
+          
+      if (existingDish == null) {
+        debugPrint('ERRORE: Nessun piatto trovato con ID: ${dish.id}');
+        // Prova a trovare il piatto per nome
+        debugPrint('Cerco il piatto per nome...');
+        final dishByName = await _supabase
+            .from('dishes')
+            .select()
+            .ilike('name', dish.name)
+            .maybeSingle()
+            .catchError((error) {
+              debugPrint('Errore nella ricerca per nome: $error');
+              return null;
+            });
+            
+        if (dishByName != null) {
+          debugPrint('Trovato piatto con nome simile, ID nel DB: ${dishByName['id']}');
+          debugPrint('ID locale: ${dish.id}');
+          debugPrint('Aggiorno con il nuovo ID...');
+          
+          // Aggiorna il piatto con l'ID corretto
+          final updateResponse = await _supabase
+              .from('dishes')
+              .update({
+                'name': dish.name,
+                'price': dish.price,
+                'category': dish.category,
+                'description': dish.description,
+                'image_url': dish.imageUrl,
+                'is_available': dish.isAvailable,
+                'sort_order': dish.sortOrder,
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', dishByName['id'])
+              .select();
+              
+          debugPrint('Risposta aggiornamento con ID corretto: $updateResponse');
+          
+          if (updateResponse != null && updateResponse.isNotEmpty) {
+            debugPrint('Piatto aggiornato con successo con ID corretto');
+          } else {
+            debugPrint('Errore nell\'aggiornamento con ID corretto');
+          }
+        } else {
+          debugPrint('Nessun piatto trovato neanche per nome');
+        }
+      } else {
+        // Il piatto esiste, procedi con l'aggiornamento normale
+        debugPrint('Dati da salvare: ${{
+          'name': dish.name,
+          'price': dish.price,
+          'category': dish.category,
+          'description': dish.description,
+          'image_url': dish.imageUrl,
+          'is_available': dish.isAvailable,
+          'sort_order': dish.sortOrder,
+          'updated_at': DateTime.now().toIso8601String(),
+        }}');
+        
+        final response = await _supabase
+            .from('dishes')
+            .update({
+              'name': dish.name,
+              'price': dish.price,
+              'category': dish.category,
+              'description': dish.description,
+              'image_url': dish.imageUrl,
+              'is_available': dish.isAvailable,
+              'sort_order': dish.sortOrder,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', dish.id)
+            .select();
+            
+        debugPrint('Risposta da Supabase: $response');
+        
+        if (response != null && response.isNotEmpty) {
+          debugPrint('Piatto aggiornato con successo: ${response[0]}');
+        } else {
+          debugPrint('Nessun piatto aggiornato, verifica l\'ID');
+        }
+      }
+      
+      // Ricarica la lista dei piatti in ogni caso
       await _loadDishes();
-    } catch (e) {
-      debugPrint('Errore durante l\'aggiornamento del piatto: $e');
+      debugPrint('=== FINE AGGIORNAMENTO PIATTO ===');
+    } catch (e, stackTrace) {
+      debugPrint('ERRORE durante l\'aggiornamento del piatto:');
+      debugPrint('Tipo: ${e.runtimeType}');
+      debugPrint('Messaggio: $e');
+      debugPrint('Stack trace: $stackTrace');
       rethrow;
     }
   }
@@ -125,15 +240,24 @@ class DishService with ChangeNotifier {
       final response = await _supabase
           .from('dishes')
           .select()
-          .order('name');
+          .order('sort_order', ascending: true)
+          .order('name', ascending: true);
       
       debugPrint('Dati ricevuti da Supabase: ${response.length} piatti');
       
+      // Log dettagliato dei dati ricevuti
+      for (var item in response) {
+        debugPrint('Dati piatto ${item['name']} - sort_order: ${item['sort_order']}');
+      }
+      
       final newDishes = (response as List)
-          .map((data) => Dish.fromJson(data))
+          .map((data) {
+            debugPrint('Creazione piatto ${data['name']} con sort_order: ${data['sort_order']}');
+            return Dish.fromJson(data);
+          })
           .toList();
       
-      debugPrint('Piatti elaborati: ${newDishes.map((d) => '${d.name} (${d.id} - ${d.isAvailable ? 'disponibile' : 'non disponibile'})').toList()}');
+      debugPrint('Piatti elaborati: ${newDishes.map((d) => '${d.name} (ID:${d.id.substring(0, 5)}..., sort:${d.sortOrder})').toList()}');
       
       _dishes = newDishes;
       debugPrint('Lista piatti aggiornata con ${_dishes.length} elementi');

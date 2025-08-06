@@ -9,6 +9,7 @@ class Dish {
   final String? imageUrl;
   final bool isAvailable;
   final int quantity;
+  final int sortOrder;
   final DateTime? updatedAt;
 
   Dish({
@@ -20,6 +21,7 @@ class Dish {
     this.imageUrl,
     this.quantity = 1,
     this.isAvailable = true,
+    this.sortOrder = 0,
     this.updatedAt,
   }) : id = id ?? const Uuid().v4();
 
@@ -28,6 +30,7 @@ class Dish {
       id: json['id'] as String? ?? const Uuid().v4(),
       name: json['name'] as String? ?? 'Senza nome',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      sortOrder: (json['sort_order'] as int?) ?? 0,
       category: json['category'] as String? ?? 'Altra',
       description: json['description'] as String?,
       imageUrl: json['image_url'] as String?,
@@ -47,6 +50,7 @@ class Dish {
     String? imageUrl,
     int? quantity,
     bool? isAvailable,
+    int? sortOrder,
     DateTime? updatedAt,
   }) {
     return Dish(
@@ -58,6 +62,7 @@ class Dish {
       imageUrl: imageUrl ?? this.imageUrl,
       quantity: quantity ?? this.quantity,
       isAvailable: isAvailable ?? this.isAvailable,
+      sortOrder: sortOrder ?? this.sortOrder,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -72,6 +77,8 @@ class Dish {
       'image_url': imageUrl,
       if (quantity > 0) 'quantity': quantity,
       'is_available': isAvailable,
+      'quantity': quantity,
+      'sort_order': sortOrder,
       'updated_at': updatedAt?.toIso8601String(),
     };
   }

@@ -18,6 +18,7 @@ class _EditDishScreenState extends State<EditDishScreen> {
   late double _price;
   late String _category;
   late bool _isAvailable;
+  late int _sortOrder;
   String? _description;
   String? _imageUrl;
 
@@ -41,11 +42,13 @@ class _EditDishScreenState extends State<EditDishScreen> {
       _description = dish.description;
       _imageUrl = dish.imageUrl;
       _isAvailable = dish.isAvailable;
+      _sortOrder = dish.sortOrder;
     } else {
       _name = '';
       _price = 0;
       _category = _categories.first;
       _isAvailable = true;
+      _sortOrder = 0;
     }
   }
 
@@ -54,15 +57,30 @@ class _EditDishScreenState extends State<EditDishScreen> {
 
     _formKey.currentState!.save();
 
-    final dish = Dish(
-      id: widget.dish?.id,
-      name: _name,
-      price: _price,
-      category: _category,
-      description: _description,
-      imageUrl: _imageUrl,
-      isAvailable: _isAvailable,
-    );
+    debugPrint('Salvataggio piatto con sortOrder: $_sortOrder');
+
+    final dish = widget.dish?.copyWith(
+          name: _name,
+          price: _price,
+          category: _category,
+          description: _description,
+          imageUrl: _imageUrl,
+          isAvailable: _isAvailable,
+          sortOrder: _sortOrder,
+          updatedAt: DateTime.now(),
+        ) ??
+        Dish(
+          name: _name,
+          price: _price,
+          category: _category,
+          description: _description,
+          imageUrl: _imageUrl,
+          isAvailable: _isAvailable,
+          sortOrder: _sortOrder,
+          updatedAt: DateTime.now(),
+        );
+        
+    debugPrint('Piatto creato con sortOrder: ${dish.sortOrder}');
 
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -109,10 +127,7 @@ class _EditDishScreenState extends State<EditDishScreen> {
             children: [
               TextFormField(
                 initialValue: _name,
-                decoration: const InputDecoration(
-                  labelText: 'Nome del piatto *',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'Nome del piatto'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Inserisci il nome del piatto';
@@ -120,6 +135,26 @@ class _EditDishScreenState extends State<EditDishScreen> {
                   return null;
                 },
                 onSaved: (value) => _name = value!,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                initialValue: _sortOrder.toString(),
+                decoration: const InputDecoration(
+                  labelText: 'Ordinamento',
+                  helperText: 'Numero più basso = visualizzazione in alto',
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Inserisci un numero';
+                  }
+                  final number = int.tryParse(value);
+                  if (number == null) {
+                    return 'Inserisci un numero valido';
+                  }
+                  return null;
+                },
+                onSaved: (value) => _sortOrder = int.tryParse(value ?? '0') ?? 0,
               ),
               const SizedBox(height: 16),
               TextFormField(
